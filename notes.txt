@@ -1,0 +1,10 @@
+rename and move done
+delete and move done
+2 regex done and tested. moved files that didn't match. think i need a special for tippearary, as it had 131-TN  and 131-TS  but no 141-TS
+update the html to put filename on right, and inlarge 1 load image.  the issue seen then, was went it moved the file the app still tried to load the image , which of course was gone.
+this required me to update the rename and delete html code to remove those images and move to the next
+i have added zoom in and zoom out.
+
+installing and configuring tessarct in v4
+
+installing ftp service in v5

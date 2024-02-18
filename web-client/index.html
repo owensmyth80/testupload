@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Viewer</title>
+    <style>
+        /* Add your CSS styles here */
+        #fileList {
+            float: left;
+            width: 30%;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        #imageContainer {
+            float: left;
+            width: 70%;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        #imageContainer img {
+            max-width: 100%;
+            max-height: 400px; /* Adjust this as needed */
+            transition: transform 0.3s ease; /* Add smooth transition for zoom */
+        }
+
+        #controls {
+            margin-top: 10px;
+        }
+
+        #controls button {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="fileList">
+        <h2>Files</h2>
+        <ul id="files">
+            <!-- JavaScript will populate this list -->
+        </ul>
+    </div>
+
+    <div id="imageContainer">
+        <h2>Image Preview</h2>
+        <div id="preview">
+            <!-- JavaScript will load the image here -->
+        </div>
+        <div id="controls">
+            <input type="text" id="filenameInput" placeholder="Enter new filename">
+            <button id="editBtn">Edit Filename</button>
+            <button id="deleteBtn">Delete Image</button>
+            <button id="ocrBtn">Perform OCR</button>
+            <button id="zoomInBtn">Zoom In</button>
+            <button id="zoomOutBtn">Zoom Out</button>
+        </div>
+        <div id="ocrResult">
+            <!-- OCR result will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        // Add your JavaScript code here
+        document.addEventListener('DOMContentLoaded', function () {
+            const fileList = document.getElementById('files');
+            const preview = document.getElementById('preview');
+            let scale = 1; // Initial scale
+
+            // Fetch filenames and populate the file list
+            fetch('/files')
+            .then(response => response.json())
+            .then(files => {
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.textContent = file;
+                    li.addEventListener('click', () => displayImage(file));
+                    fileList.appendChild(li);
+                });
+
+                // Load the first image by default
+                if (files.length > 0) {
+                    displayImage(files[0]);
+                }
+            });
+
+            // Display image in the preview container
+            function displayImage(file) {
+                const imageUrl = `/uploads/${file}`;
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                preview.innerHTML = '';
+                preview.appendChild(img);
+
+                // Update filename input
+                document.getElementById('filenameInput').value = file;
+                // Reset scale
+                scale = 1;
+                applyZoom();
+            }
+
+            // Function to zoom in
+            function zoomIn() {
+                scale += 0.1;
+                applyZoom();
+            }
+
+            // Function to zoom out
+            function zoomOut() {
+                scale -= 0.1;
+                applyZoom();
+            }
+
+            // Function to apply zoom
+            function applyZoom() {
+                const img = document.querySelector('#preview img');
+                img.style.transform = `scale(${scale})`;
+            }
+
+            // Attach event listeners to zoom buttons
+            document.getElementById('zoomInBtn').addEventListener('click', zoomIn);
+            document.getElementById('zoomOutBtn').addEventListener('click', zoomOut);
+
+            // Handle edit filename button click
+            document.getElementById('editBtn').addEventListener('click', function () {
+                const newFilename = document.getElementById('filenameInput').value;
+                const currentFilename = preview.querySelector('img').src.split('/').pop();
+                // Send a request to the server to edit the filename
+                fetch(`/files/${currentFilename}/${newFilename}`, {
+                    method: 'PUT'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Remove the filename from the file list
+                        const files = fileList.getElementsByTagName('li');
+                        for (let i = 0; i < files.length; i++) {
+                            if (files[i].textContent === currentFilename) {
+                                files[i].remove();
+                                break;
+                            }
+                        }
+                        // Check if the next image is available
+                        const nextImageIndex = Array.from(files).findIndex(file => file.textContent !== currentFilename);
+                        if (nextImageIndex !== -1) {
+                            const nextImageFilename = files[nextImageIndex].textContent;
+                            displayImage(nextImageFilename);
+                        } else {
+                            // If no next image available, clear the preview
+                            preview.innerHTML = '';
+                        }
+                    } else {
+                        console.error('Failed to edit filename');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error editing filename:', error);
+                });
+            });
+
+            // Handle delete image button click
+            document.getElementById('deleteBtn').addEventListener('click', function () {
+                const filename = preview.querySelector('img').src.split('/').pop();
+                // Send a request to the server to delete the image
+                fetch(`/files/${filename}`, {
+                    method: 'PUT'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Remove the file from the file list
+                        const files = fileList.getElementsByTagName('li');
+                        for (let i = 0; i < files.length; i++) {
+                            if (files[i].textContent === filename) {
+                                files[i].remove();
+                                break;
+                            }
+                        }
+                        // Check if the next image is available
+                        const nextImageIndex = Array.from(files).findIndex(file => file.textContent !== filename);
+                        if (nextImageIndex !== -1) {
+                            const nextImageFilename = files[nextImageIndex].textContent;
+                            displayImage(nextImageFilename);
+                        } else {
+                            // If no next image available, clear the preview
+                            preview.innerHTML = '';
+                        }
+                    } else {
+                        console.error('Failed to delete image');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting image:', error);
+                });
+            });
+
+            // Handle OCR button click
+            document.getElementById('ocrBtn').addEventListener('click', function () {
+                const imageUrl = preview.querySelector('img').src;
+                Tesseract.recognize(imageUrl, 'eng', { logger: m => console.log(m) })
+                .then(({ data: { text } }) => {
+                    // Display OCR result
+                    document.getElementById('ocrResult').innerText = text;
+                });
+            });
+        });
+    </script>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+
+
+</body>
+</html>
